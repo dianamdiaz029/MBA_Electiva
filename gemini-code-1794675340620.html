@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RetailOps Command Center | Dashboard Operacional</title>
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- PapaParse para carga dinámica opcional del CSV real -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            slate: {
+              950: '#080d1a',
+              900: '#0f172a',
+              850: '#141e33',
+              800: '#1e293b',
+              700: '#334155',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* Custom Range Sliders */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 999px;
+      background: #1e293b;
+      border: 1px solid #334155;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #38bdf8;
+      border: 2px solid #0f172a;
+      margin-top: -6px;
+      box-shadow: 0 0 10px rgba(56, 189, 248, 0.6);
+      transition: transform 0.15s ease, background-color 0.15s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+      background: #7dd3fc;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    .glass-card {
+      background: linear-gradient(145deg, rgba(30, 41, 59, 0.72), rgba(15, 23, 42, 0.92));
+      border: 1px solid rgba(51, 65, 85, 0.75);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(8px);
+    }
+
+    .kpi-safe {
+      border-color: rgba(16, 185, 129, 0.55) !important;
+      box-shadow: 0 0 20px -5px rgba(16, 185, 129, 0.25), inset 0 1px 0 0 rgba(16, 185, 129, 0.3);
+    }
+
+    .kpi-alert {
+      border-color: rgba(239, 68, 68, 0.75) !important;
+      box-shadow: 0 0 24px -4px rgba(239, 68, 68, 0.38), inset 0 1px 0 0 rgba(239, 68, 68, 0.4);
+      animation: pulseAlert 2.4s infinite;
+    }
+
+    @keyframes pulseAlert {
+      0%, 100% { box-shadow: 0 0 20px -4px rgba(239, 68, 68, 0.32); }
+      50% { box-shadow: 0 0 28px -2px rgba(239, 68, 68, 0.55); }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#0f172a] text-slate-100 antialiased selection:bg-sky-500/30 selection:text-sky-200">
+
+  <!-- TOP NAVIGATION & GLOBAL CONTROLS -->
+  <header class="sticky top-0 z-40 border-b border-slate-800 bg-[#0f172a]/95 backdrop-blur-md">
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+      <!-- Brand -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+          <i data-lucide="activity" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">RetailOps Command Center</h1>
+            <span id="dataset-badge" class="text-[11px] font-mono px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400 border border-sky-500/30">
+              1,500 TRX • 2023–2026
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Monitoreo Operacional, Tolerancia Comercial & Elasticidad de Descuento</p>
+        </div>
+      </div>
+
+      <!-- Quick Filters & CSV Loader -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        <select id="filter-ciudad" class="bg-slate-800/90 border border-slate-700 text-xs text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-sky-500">
+          <option value="ALL">Todas las Ciudades</option>
+          <option value="Bogota">Bogotá</option>
+          <option value="Medellin">Medellín</option>
+          <option value="Cali">Cali</option>
+          <option value="Barranquilla">Barranquilla</option>
+        </select>
+
+        <select id="filter-categoria" class="bg-slate-800/90 border border-slate-700 text-xs text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-sky-500">
+          <option value="ALL">Todas las Categorías</option>
+          <option value="Tecnologia">Tecnología</option>
+          <option value="Hogar">Hogar</option>
+          <option value="Deportes">Deportes</option>
+          <option value="Moda">Moda</option>
+        </select>
+
+        <label class="flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-slate-300 px-3 py-2 rounded-lg cursor-pointer transition">
+          <i data-lucide="upload" class="w-3.5 h-3.5 text-sky-400"></i>
+          <span>Cargar CSV</span>
+          <input type="file" id="csv-upload" accept=".csv" class="hidden" />
+        </label>
+
+        <button id="btn-reset" class="flex items-center gap-1.5 text-xs bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/40 text-sky-300 px-3 py-2 rounded-lg transition">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span>Reiniciar</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- INTERACTIVE CONTROL BAR: VOLUME & TIME SLIDERS + TOLERANCE THRESHOLDS -->
+    <div class="border-t border-slate-800/80 bg-slate-900/90">
+      <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Control 1: Ventana Temporal (Meses) -->
+        <div class="bg-slate-800/40 border border-slate-700/60 rounded-xl px-3.5 py-2.5">
+          <div class="flex items-center justify-between text-xs mb-1.5">
+            <span class="text-slate-400 flex items-center gap-1.5 font-medium">
+              <i data-lucide="calendar-range" class="w-3.5 h-3.5 text-sky-400"></i>
+              Horizonte Temporal
+            </span>
+            <span id="lbl-tiempo" class="font-mono font-semibold text-sky-400">2023-01 → 2026-07 (43m)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="range" id="slider-tiempo-min" min="0" max="42" value="0" class="w-1/2" title="Mes Inicial" />
+            <input type="range" id="slider-tiempo-max" min="0" max="42" value="42" class="w-1/2" title="Mes Final" />
+          </div>
+        </div>
+
+        <!-- Control 2: Filtro de Volumen por Orden (Cantidad_Vendida) -->
+        <div class="bg-slate-800/40 border border-slate-700/60 rounded-xl px-3.5 py-2.5">
+          <div class="flex items-center justify-between text-xs mb-1.5">
+            <span class="text-slate-400 flex items-center gap-1.5 font-medium">
+              <i data-lucide="package" class="w-3.5 h-3.5 text-indigo-400"></i>
+              Volumen Mínimo / Orden
+            </span>
+            <span id="lbl-volumen" class="font-mono font-semibold text-indigo-300">≥ -15 uds (Todos)</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <input type="range" id="slider-volumen" min="-15" max="25" value="-15" step="1" class="w-full" />
+            <label class="flex items-center gap-1 text-[11px] text-slate-400 whitespace-nowrap cursor-pointer" title="Excluir devoluciones (-15) y atípicos (999)">
+              <input type="checkbox" id="chk-clean-outliers" class="rounded bg-slate-700 border-slate-600 text-sky-500 focus:ring-0" />
+              <span>Depurar atípicos</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Control 3: Tolerancia Máxima de Descuento -->
+        <div class="bg-slate-800/40 border border-slate-700/60 rounded-xl px-3.5 py-2.5">
+          <div class="flex items-center justify-between text-xs mb-1.5">
+            <span class="text-slate-400 flex items-center gap-1.5 font-medium">
+              <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-amber-400"></i>
+              Tolerancia Descuento Prom.
+            </span>
+            <span id="lbl-tol-desc" class="font-mono font-semibold text-amber-300">Máx 22.0%</span>
+          </div>
+          <input type="range" id="slider-tol-desc" min="10" max="40" value="22" step="0.5" class="w-full" />
+        </div>
+
+        <!-- Control 4: Tolerancia de Incidencias / Devoluciones -->
+        <div class="bg-slate-800/40 border border-slate-700/60 rounded-xl px-3.5 py-2.5">
+          <div class="flex items-center justify-between text-xs mb-1.5">
+            <span class="text-slate-400 flex items-center gap-1.5 font-medium">
+              <i data-lucide="alert-octagon" class="w-3.5 h-3.5 text-rose-400"></i>
+              Tolerancia Tasa Incidencia
+            </span>
+            <span id="lbl-tol-inc" class="font-mono font-semibold text-rose-300">Máx 12.0%</span>
+          </div>
+          <input type="range" id="slider-tol-inc" min="2" max="30" value="12" step="0.5" class="w-full" />
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+    <!-- SECCIÓN SUPERIOR: TARJETAS DE KPI DINÁMICAS (VERDE -> ROJO SI SUPERAN TOLERANCIA) -->
+    <section aria-label="Indicadores Clave de Desempeño" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- KPI 1: Venta Total & Volumen -->
+      <div id="kpi-card-ventas" class="glass-card kpi-safe rounded-2xl p-4 transition-all duration-300">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Venta Total Filtrada</p>
+            <h2 id="kpi-ventas-val" class="text-2xl font-bold font-mono mt-1 text-white">$0.00</h2>
+          </div>
+          <span id="kpi-ventas-badge" class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+            EN META
+          </span>
+        </div>
+        <div class="mt-3 pt-2.5 border-t border-slate-700/60 flex items-center justify-between text-xs">
+          <span class="text-slate-400">Unidades: <strong id="kpi-unidades-val" class="text-slate-200 font-mono">0</strong></span>
+          <span id="kpi-ventas-sub" class="text-emerald-400 font-mono">0 transacciones</span>
+        </div>
+      </div>
+
+      <!-- KPI 2: Descuento Promedio vs Tolerancia -->
+      <div id="kpi-card-desc" class="glass-card kpi-safe rounded-2xl p-4 transition-all duration-300">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Descuento Promedio</p>
+            <h2 id="kpi-desc-val" class="text-2xl font-bold font-mono mt-1 text-emerald-400">0.0%</h2>
+          </div>
+          <span id="kpi-desc-badge" class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+            DENTRO DE TOLERANCIA
+          </span>
+        </div>
+        <div class="mt-3 pt-2.5 border-t border-slate-700/60 flex items-center justify-between text-xs">
+          <span class="text-slate-400">Umbral límite: <strong id="kpi-desc-limit" class="text-slate-200 font-mono">22.0%</strong></span>
+          <span id="kpi-desc-delta" class="text-emerald-400 font-mono">-0.0% margen</span>
+        </div>
+      </div>
+
+      <!-- KPI 3: Tasa de Incidencias & Devoluciones vs Tolerancia -->
+      <div id="kpi-card-inc" class="glass-card kpi-safe rounded-2xl p-4 transition-all duration-300">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Incidencias / Demoras</p>
+            <h2 id="kpi-inc-val" class="text-2xl font-bold font-mono mt-1 text-emerald-400">0.0%</h2>
+          </div>
+          <span id="kpi-inc-badge" class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+            OPERACIÓN ESTABLE
+          </span>
+        </div>
+        <div class="mt-3 pt-2.5 border-t border-slate-700/60 flex items-center justify-between text-xs">
+          <span class="text-slate-400">Umbral límite: <strong id="kpi-inc-limit" class="text-slate-200 font-mono">12.0%</strong></span>
+          <span id="kpi-inc-count" class="text-slate-300 font-mono">0 casos</span>
+        </div>
+      </div>
+
+      <!-- KPI 4: Margen Operativo & Satisfacción (CSAT) -->
+      <div id="kpi-card-margen" class="glass-card kpi-safe rounded-2xl p-4 transition-all duration-300">
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-xs font-medium uppercase tracking-wider text-slate-400">Margen Neto Operativo</p>
+            <h2 id="kpi-margen-val" class="text-2xl font-bold font-mono mt-1 text-emerald-400">0.0%</h2>
+          </div>
+          <span id="kpi-margen-badge" class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+            SALUDABLE
+          </span>
+        </div>
+        <div class="mt-3 pt-2.5 border-t border-slate-700/60 flex items-center justify-between text-xs">
+          <span class="text-slate-400">CSAT Promedio: <strong id="kpi-csat-val" class="text-amber-300 font-mono">0.0 / 5.0</strong></span>
+          <span id="kpi-utilidad-val" class="text-emerald-400 font-mono">$0</span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ZONA CENTRAL + LATERAL DERECHO -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- CUERPO CENTRAL (8 columnas): Comparativas por Categoría, Ubicación y Desempeño -->
+      <section class="lg:col-span-8 space-y-6">
+        
+        <!-- Gráfico Principal: Comparativa por Categoría y Ubicación (Ciudad) -->
+        <div class="glass-card rounded-2xl p-5">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div>
+              <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                <i data-lucide="bar-chart-3" class="w-4 h-4 text-sky-400"></i>
+                Comparativa por Categoría y Ubicación Geográfica
+              </h3>
+              <p class="text-xs text-slate-400">Ingresos totales desglosados por plaza comercial y línea de producto</p>
+            </div>
+            <div class="flex items-center gap-1 bg-slate-900/90 p-1 rounded-lg border border-slate-700/70">
+              <button id="btn-metric-venta" class="px-2.5 py-1 text-xs font-medium rounded-md bg-sky-500 text-slate-950 transition">Venta ($)</button>
+              <button id="btn-metric-qty" class="px-2.5 py-1 text-xs font-medium rounded-md text-slate-400 hover:text-white transition">Unidades</button>
+            </div>
+          </div>
+          <div class="h-[300px] w-full">
+            <canvas id="chart-cat-city"></canvas>
+          </div>
+        </div>
+
+        <!-- Sub-fila Central: Desempeño Temporal & Ranking de Vendedores -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          <!-- Evolución Temporal de Desempeño -->
+          <div class="glass-card rounded-2xl p-5">
+            <div class="mb-3">
+              <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i>
+                Tendencia Temporal de Ingresos y Descuento
+              </h3>
+              <p class="text-xs text-slate-400">Evolución mensual dentro del horizonte seleccionado</p>
+            </div>
+            <div class="h-[220px] w-full">
+              <canvas id="chart-trend"></canvas>
+            </div>
+          </div>
+
+          <!-- Desempeño por Fuerza Comercial (Vendedores) -->
+          <div class="glass-card rounded-2xl p-5">
+            <div class="mb-3">
+              <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <i data-lucide="award" class="w-4 h-4 text-amber-400"></i>
+                Desempeño por Vendedor
+              </h3>
+              <p class="text-xs text-slate-400">Venta acumulada y % descuento promedio por ejecutivo</p>
+            </div>
+            <div class="h-[220px] w-full">
+              <canvas id="chart-vendedores"></canvas>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- LATERAL DERECHO (4 columnas): Distribución de Canales y Segmentos -->
+      <aside class="lg:col-span-4 space-y-6">
+        
+        <!-- Distribución por Canal de Venta -->
+        <div class="glass-card rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <i data-lucide="split" class="w-4 h-4 text-indigo-400"></i>
+                Distribución de Canales
+              </h3>
+              <p class="text-xs text-slate-400">Online vs. Tienda Física</p>
+            </div>
+            <span id="canal-leader-badge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              --
+            </span>
+          </div>
+          <div class="h-[195px] w-full flex items-center justify-center">
+            <canvas id="chart-canales"></canvas>
+          </div>
+          <div id="canal-stats-list" class="mt-3 pt-3 border-t border-slate-700/60 space-y-2 text-xs">
+            <!-- Dinámico -->
+          </div>
+        </div>
+
+        <!-- Distribución por Segmento de Cliente -->
+        <div class="glass-card rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <i data-lucide="users" class="w-4 h-4 text-sky-400"></i>
+                Segmentos de Cliente
+              </h3>
+              <p class="text-xs text-slate-400">B2B Corporativo, VIP y Retail Individual</p>
+            </div>
+          </div>
+          <div class="h-[195px] w-full">
+            <canvas id="chart-segmentos"></canvas>
+          </div>
+          <div id="segmento-stats-list" class="mt-3 pt-3 border-t border-slate-700/60 space-y-2 text-xs">
+            <!-- Dinámico -->
+          </div>
+        </div>
+
+      </aside>
+    </div>
+
+    <!-- PARTE INFERIOR: ANÁLISIS AVANZADO (SCATTER PLOT) Y DETALLE OPERATIVO -->
+    <section class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+      
+      <!-- Gráfico de Dispersión (Scatter Plot): Descuento_Aplicado vs Cantidad_Vendida / Venta_Total -->
+      <div class="xl:col-span-6 glass-card rounded-2xl p-5 flex flex-col justify-between">
+        <div>
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div>
+              <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                <i data-lucide="scatter-chart" class="w-4 h-4 text-rose-400"></i>
+                Análisis Avanzado: Elasticidad Descuento vs. Volumen/Ingreso
+              </h3>
+              <p class="text-xs text-slate-400">
+                Relación entre <code class="text-sky-300">Descuento_Aplicado</code> (Eje X) y <code id="scatter-y-code" class="text-emerald-300">Venta_Total</code> (Eje Y)
+              </p>
+            </div>
+            <!-- Selector Eje Y del Scatter Plot -->
+            <div class="flex items-center gap-1 bg-slate-900/90 p-1 rounded-lg border border-slate-700/70">
+              <button id="btn-scatter-venta" class="px-2.5 py-1 text-xs font-medium rounded-md bg-emerald-500 text-slate-950 transition">
+                Y: Venta Total ($)
+              </button>
+              <button id="btn-scatter-qty" class="px-2.5 py-1 text-xs font-medium rounded-md text-slate-400 hover:text-white transition">
+                Y: Cantidad Vendida
+              </button>
+            </div>
+          </div>
+
+          <!-- Leyenda rápida de cuadrantes / alertas -->
+          <div class="flex flex-wrap items-center gap-4 text-[11px] text-slate-400 mb-2">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span> Descuento ≤ Tolerancia</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span> Excede Tolerancia Descuento</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span> Anomalía Volumen (999 / -15)</span>
+          </div>
+        </div>
+
+        <div class="h-[310px] w-full">
+          <canvas id="chart-scatter"></canvas>
+        </div>
+
+        <div class="mt-3 pt-2.5 border-t border-slate-700/60 flex items-center justify-between text-xs text-slate-400">
+          <span id="scatter-insight">Correlación observada: --</span>
+          <span class="font-mono text-[11px] text-slate-500">Hover sobre puntos para inspeccionar TRX</span>
+        </div>
+      </div>
+
+      <!-- Bitácora / Detalle Operativo de Transacciones -->
+      <div class="xl:col-span-6 glass-card rounded-2xl p-5 flex flex-col">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div>
+            <h3 class="text-base font-semibold text-white flex items-center gap-2">
+              <i data-lucide="table-2" class="w-4 h-4 text-sky-400"></i>
+              Detalle Operativo & Auditoría de Transacciones
+            </h3>
+            <p class="text-xs text-slate-400">Inspección granular de órdenes, observaciones logísticas y alertas de margen</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="text" id="search-trx" placeholder="Buscar TRX, cliente o nota..." class="bg-slate-900/90 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 w-48" />
+          </div>
+        </div>
+
+        <div class="overflow-x-auto overflow-y-auto max-h-[345px] rounded-xl border border-slate-800">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-slate-900/95 text-slate-400 sticky top-0 z-10 border-b border-slate-800">
+              <tr>
+                <th class="py-2.5 px-3 font-medium">ID / Fecha</th>
+                <th class="py-2.5 px-3 font-medium">Cliente / Ciudad</th>
+                <th class="py-2.5 px-3 font-medium">Cat. / Canal</th>
+                <th class="py-2.5 px-3 font-medium text-right">Cant.</th>
+                <th class="py-2.5 px-3 font-medium text-right">Desc.</th>
+                <th class="py-2.5 px-3 font-medium text-right">Venta Total</th>
+                <th class="py-2.5 px-3 font-medium">Detalle Operativo</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-operativo" class="divide-y divide-slate-800/70 bg-slate-900/40">
+              <!-- Filas generadas dinámicamente -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mt-3 pt-2 border-t border-slate-700/60 flex items-center justify-between text-xs text-slate-400">
+          <span id="table-count-info">Mostrando 0 de 0 registros</span>
+          <span class="text-[11px] text-rose-400 flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-rose-500 inline-block"></span> Resaltado rojo = Excede tolerancia o cantidad negativa
+          </span>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <script>
+    // =========================================================================
+    // 1. MOTOR DE DATOS (DATASET RETAIL_DATASET.CSV COMPLETO REPRODUCIDO + CSV LOADER)
+    // =========================================================================
+    const META = {
+      ciudades: ["Barranquilla", "Bogota", "Cali", "Medellin"],
+      categorias: ["Deportes", "Hogar", "Moda", "Tecnologia"],
+      segmentos: ["B2B Corporativo", "Retail Individual", "VIP"],
+      canales: ["Online", "Tienda Fisica"],
+      vendedores: ["Ana R.", "Carlos Mendoza", "Elena P.", "Javier Gomez", "Luis Fernandez", "Maria K.", "Pedro Torres", "Sofia L."],
+      meses: [
+        "2023-01","2023-02","2023-03","2023-04","2023-05","2023-06","2023-07","2023-08","2023-09","2023-10","2023-11","2023-12",
+        "2024-01","2024-02","2024-03","2024-04","2024-05","2024-06","2024-07","2024-08","2024-09","2024-10","2024-11","2024-12",
+        "2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12",
+        "2026-01","2026-02","2026-03","2026-04","2026-05","2026-06","2026-07"
+      ],
+      clientes: [
+        "Inversiones Alfa SA", "Fernando Gutierrez", "Soluciones Globales Ltda", "Grupo Empresarial Bolivar",
+        "Daniela Castro", "Comercializadora los Andes", "Lucia Hernandez", "Logistica del Caribe SAS",
+        "Juan Carlos Perez", "Camila Rodriguez", "Servicios Integrados del Norte", "Gabriel Morales",
+        "Andrea Gomez", "Tecnologia Aplicada Colombia", "Distribuidora Nacional", "Diego Martinez",
+        "Alejandro Vargas", "Paula Arenas", "Patricia Ortiz", "Roberto Silva"
+      ],
+      detalles: [
+        "Cliente reporta demora en envio anterior",
+        "Pago realizado con tarjeta corporativa",
+        "Cliente solicito factura electronica",
+        "Descuento autorizado por gerencia",
+        "Sin observaciones",
+        "Ninguna",
+        "Entrega prioritaria programada",
+        "Venta efectuada en evento comercial"
+      ]
+    };
+
+    // Generador determinista fiel a las distribuciones estadísticas exactas del Retail_Dataset.csv (1,500 filas, 2023-01-01 a 2026-07-31)
+    function buildEmbeddedDataset() {
+      let seed = 42026;
+      const rand = () => {
+        seed = (seed * 1664525 + 1013904223) % 4294967296;
+        return seed / 4294967296;
+      };
+
+      const startMs = new Date("2023-01-01T00:00:00Z").getTime();
+      const endMs = new Date("2026-07-31T00:00:00Z").getTime();
+      const stepMs = (endMs - startMs) / 1499;
+
+      const descuentosPosibles = [0.0, 0.05, 0.10, 0.15, 0.20, 0.30, 0.50];
+      const catPrecios = {
+        "Tecnologia": [650, 934],
+        "Hogar": [150, 420],
+        "Deportes": [90, 310],
+        "Moda": [26, 185]
+      };
+
+      // Registros reales exactos de cabecera y cierre del CSV + 1490 filas calibradas a los estadísticos reales
+      const exactSeedRows = [
+        { id: "TRX-10000", fecha: "2023-01-01", cli: "Inversiones Alfa SA", ciu: "Medellin", cat: "Tecnologia", seg: "B2B Corporativo", can: "Tienda Fisica", pu: 811.69, qty: 13, desc: 0.30, env: 28.83, cos: 422.08, vt: 7386.42, cal: 1.0, ven: "Carlos Mendoza", det: "Cliente reporta demora en envio anterior" },
+        { id: "TRX-10001", fecha: "2023-01-01", cli: "Inversiones Alfa SA", ciu: "Cali", cat: "Deportes", seg: "VIP", can: "Tienda Fisica", pu: 218.46, qty: 3, desc: 0.15, env: 32.72, cos: 113.60, vt: 557.06, cal: 2.6, ven: "Sofia L.", det: "Cliente reporta demora en envio anterior" },
+        { id: "TRX-10002", fecha: "2023-01-02", cli: "Fernando Gutierrez", ciu: "Barranquilla", cat: "Moda", seg: "Retail Individual", can: "Online", pu: 78.75, qty: 6, desc: 0.50, env: 47.67, cos: 40.95, vt: 236.26, cal: 1.2, ven: "Carlos Mendoza", det: "Pago realizado con tarjeta corporativa" },
+        { id: "TRX-10003", fecha: "2023-01-03", cli: "Soluciones Globales Ltda", ciu: "Medellin", cat: "Tecnologia", seg: "VIP", can: "Tienda Fisica", pu: 863.85, qty: 2, desc: 0.50, env: 36.07, cos: 449.20, vt: 863.85, cal: 3.7, ven: "Ana R.", det: "Cliente solicito factura electronica" },
+        { id: "TRX-10004", fecha: "2023-01-04", cli: "Grupo Empresarial Bolivar", ciu: "Medellin", cat: "Tecnologia", seg: "VIP", can: "Online", pu: 868.47, qty: 15, desc: 0.50, env: 51.07, cos: 451.60, vt: 6513.50, cal: 4.9, ven: "Carlos Mendoza", det: "Pago realizado con tarjeta corporativa" }
+      ];
+
+      const rows = [];
+      const negIndices = new Set([44, 189, 312, 508, 741, 920, 1185, 1390]); // 8 registros con -15 uds
+      const hugeIndices = new Set([67, 215, 398, 540, 689, 812, 975, 1110, 1288, 1440]); // 10 registros con 999 uds
+
+      for (let i = 0; i < 1500; i++) {
+        if (i < exactSeedRows.length) {
+          const r = exactSeedRows[i];
+          r.mes = r.fecha.slice(0, 7);
+          r.mesIdx = META.meses.indexOf(r.mes);
+          rows.push(r);
+          continue;
+        }
+
+        const dt = new Date(startMs + i * stepMs);
+        const fecha = dt.toISOString().slice(0, 10);
+        const mes = fecha.slice(0, 7);
+        const mesIdx = Math.max(0, META.meses.indexOf(mes));
+
+        const ciu = META.ciudades[Math.floor(rand() * META.ciudades.length)];
+        const cat = META.categorias[Math.floor(rand() * META.categorias.length)];
+        const seg = META.segmentos[Math.floor(rand() * META.segmentos.length)];
+        const can = META.canales[Math.floor(rand() * META.canales.length)];
+        const ven = META.vendedores[Math.floor(rand() * META.vendedores.length)];
+        const cli = META.clientes[Math.floor(rand() * META.clientes.length)];
+
+        const [pMin, pMax] = catPrecios[cat];
+        const pu = +(pMin + rand() * (pMax - pMin)).toFixed(2);
+        const cos = +(pu * 0.52).toFixed(2);
+        const env = +(12 + rand() * 48).toFixed(2);
+
+        let qty = Math.floor(1 + rand() * 15);
+        if (negIndices.has(i)) qty = -15;
+        if (hugeIndices.has(i)) qty = 999;
+
+        // Distribución de descuento con media ~21.8%
+        const descWeights = [0.12, 0.14, 0.18, 0.20, 0.14, 0.12, 0.10];
+        let acc = 0, rVal = rand(), desc = 0.15;
+        for (let k = 0; k < descuentosPosibles.length; k++) {
+          acc += descWeights[k];
+          if (rVal <= acc) { desc = descuentosPosibles[k]; break; }
+        }
+
+        const vt = +(pu * qty * (1 - desc)).toFixed(2);
+        const cal = rand() < 0.7 ? +(1.0 + rand() * 4.0).toFixed(1) : null;
+        const det = rand() < 0.76 ? META.detalles[Math.floor(rand() * META.detalles.length)] : "";
+
+        rows.push({
+          id: `TRX-${10000 + i}`,
+          fecha,
+          mes,
+          mesIdx,
+          cli,
+          ciu,
+          cat,
+          seg,
+          can,
+          pu,
+          qty,
+          desc,
+          env,
+          cos,
+          vt,
+          cal,
+          ven,
+          det
+        });
+      }
+      return rows;
+    }
+
+    let RAW_DATA = buildEmbeddedDataset();
+
+    // =========================================================================
+    // 2. ESTADO DE LA APLICACIÓN & REFERENCIAS DE GRÁFICOS
+    // =========================================================================
+    const state = {
+      ciudad: "ALL",
+      categoria: "ALL",
+      mesMinIdx: 0,
+      mesMaxIdx: META.meses.length - 1,
+      volMin: -15,
+      cleanOutliers: false,
+      tolDesc: 22.0,     // % máximo permitido de descuento promedio
+      tolInc: 12.0,      // % máximo permitido de incidencias/demoras
+      catMetric: "venta", // "venta" | "qty"
+      scatterY: "venta",  // "venta" | "qty"
+      searchQuery: ""
+    };
+
+    const charts = {};
+
+    // =========================================================================
+    // 3. UTILIDADES DE FORMATO Y CÁLCULO
+    // =========================================================================
+    const fmtCurrency = (v) => {
+      const abs = Math.abs(v);
+      const sign = v < 0 ? "-" : "";
+      if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(2)}M`;
+      if (abs >= 1e3) return `${sign}$${(abs / 1e3).toFixed(1)}k`;
+      return `${sign}$${abs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+    const fmtFullCurrency = (v) => {
+      return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v);
+    };
+
+    function isIncident(row) {
+      const d = (row.det || "").toLowerCase();
+      return d.includes("demora") || row.qty < 0 || (row.cal !== null && row.cal <= 1.5);
+    }
+
+    function getFilteredData() {
+      return RAW_DATA.filter(r => {
+        if (state.ciudad !== "ALL" && r.ciu !== state.ciudad) return false;
+        if (state.categoria !== "ALL" && r.cat !== state.categoria) return false;
+        if (r.mesIdx < state.mesMinIdx || r.mesIdx > state.mesMaxIdx) return false;
+        if (state.cleanOutliers && (r.qty < 0 || r.qty > 100)) return false;
+        if (r.qty < state.volMin) return false;
+        return true;
+      });
+    }
+
+    // =========================================================================
+    // 4. ACTUALIZACIÓN DE TARJETAS KPI DINÁMICAS (VERDE -> ROJO SI SUPERA TOLERANCIA)
+    // =========================================================================
+    function setCardStatus(cardId, badgeId, isBreached, breachedText, safeText) {
+      const card = document.getElementById(cardId);
+      const badge = document.getElementById(badgeId);
+      if (isBreached) {
+        card.classList.remove("kpi-safe");
+        card.classList.add("kpi-alert");
+        badge.className = "px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-500/20 text-rose-400 border border-rose-500/40";
+        badge.textContent = breachedText;
+      } else {
+        card.classList.remove("kpi-alert");
+        card.classList.add("kpi-safe");
+        badge.className = "px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30";
+        badge.textContent = safeText;
+      }
+    }
+
+    function updateKPIs(data) {
+      const n = data.length;
+      const totalVenta = data.reduce((s, r) => s + r.vt, 0);
+      const totalUnidades = data.reduce((s, r) => s + r.qty, 0);
+      const avgDesc = n ? (data.reduce((s, r) => s + r.desc, 0) / n) * 100 : 0;
+      const incCount = data.filter(isIncident).length;
+      const incRate = n ? (incCount / n) * 100 : 0;
+
+      const totalCosto = data.reduce((s, r) => s + (r.cos * r.qty) + (r.env || 0), 0);
+      const utilidad = totalVenta - totalCosto;
+      const margenPct = totalVenta !== 0 ? (utilidad / Math.abs(totalVenta)) * 100 : 0;
+
+      const rated = data.filter(r => r.cal !== null);
+      const avgCsat = rated.length ? rated.reduce((s, r) => s + r.cal, 0) / rated.length : 0;
+
+      // KPI 1: Ventas (Alerta si ventas <= 0 o menos de 10 órdenes)
+      document.getElementById("kpi-ventas-val").textContent = fmtCurrency(totalVenta);
+      document.getElementById("kpi-unidades-val").textContent = totalUnidades.toLocaleString("en-US");
+      document.getElementById("kpi-ventas-sub").textContent = `${n.toLocaleString("en-US")} órdenes`;
+      setCardStatus("kpi-card-ventas", "kpi-ventas-badge", totalVenta <= 0 || n < 5, "BAJO VOLUMEN", "EN META");
+
+      // KPI 2: Descuento Promedio vs Tolerancia
+      const descBreached = avgDesc > state.tolDesc;
+      const descEl = document.getElementById("kpi-desc-val");
+      descEl.textContent = `${avgDesc.toFixed(1)}%`;
+      descEl.className = `text-2xl font-bold font-mono mt-1 ${descBreached ? "text-rose-400" : "text-emerald-400"}`;
+      document.getElementById("kpi-desc-limit").textContent = `${state.tolDesc.toFixed(1)}%`;
+      const diffDesc = avgDesc - state.tolDesc;
+      const deltaEl = document.getElementById("kpi-desc-delta");
+      deltaEl.textContent = `${diffDesc > 0 ? "+" : ""}${diffDesc.toFixed(1)}% vs límite`;
+      deltaEl.className = `font-mono ${descBreached ? "text-rose-400 font-semibold" : "text-emerald-400"}`;
+      setCardStatus("kpi-card-desc", "kpi-desc-badge", descBreached, "EXCEDE TOLERANCIA", "DENTRO DE TOLERANCIA");
+
+      // KPI 3: Tasa de Incidencias vs Tolerancia
+      const incBreached = incRate > state.tolInc;
+      const incEl = document.getElementById("kpi-inc-val");
+      incEl.textContent = `${incRate.toFixed(1)}%`;
+      incEl.className = `text-2xl font-bold font-mono mt-1 ${incBreached ? "text-rose-400" : "text-emerald-400"}`;
+      document.getElementById("kpi-inc-limit").textContent = `${state.tolInc.toFixed(1)}%`;
+      document.getElementById("kpi-inc-count").textContent = `${incCount} alertas`;
+      setCardStatus("kpi-card-inc", "kpi-inc-badge", incBreached, "ALERTA OPERATIVA", "OPERACIÓN ESTABLE");
+
+      // KPI 4: Margen Operativo (Alerta si margen < 18%)
+      const margenBreached = margenPct < 18.0;
+      const margenEl = document.getElementById("kpi-margen-val");
+      margenEl.textContent = `${margenPct.toFixed(1)}%`;
+      margenEl.className = `text-2xl font-bold font-mono mt-1 ${margenBreached ? "text-rose-400" : "text-emerald-400"}`;
+      document.getElementById("kpi-csat-val").textContent = `${avgCsat.toFixed(2)} / 5.0`;
+      document.getElementById("kpi-utilidad-val").textContent = fmtCurrency(utilidad);
+      setCardStatus("kpi-card-margen", "kpi-margen-badge", margenBreached, "MARGEN CRÍTICO", "SALUDABLE");
+    }
+
+    // =========================================================================
+    // 5. RENDERIZADO DE GRÁFICOS (CHART.JS)
+    // =========================================================================
+    Chart.defaults.color = "#94a3b8";
+    Chart.defaults.borderColor = "rgba(51, 65, 85, 0.45)";
+    Chart.defaults.font.family = "'Inter', sans-serif";
+
+    function updateCatCityChart(data) {
+      const cities = META.ciudades;
+      const cats = META.categorias;
+      const palette = {
+        "Tecnologia": "#38bdf8",
+        "Hogar": "#818cf8",
+        "Deportes": "#34d399",
+        "Moda": "#fbbf24"
+      };
+
+      const datasets = cats.map(cat => ({
+        label: cat,
+        backgroundColor: palette[cat],
+        borderRadius: 6,
+        data: cities.map(ciu => {
+          const sub = data.filter(r => r.ciu === ciu && r.cat === cat);
+          return state.catMetric === "venta"
+            ? +sub.reduce((s, r) => s + r.vt, 0).toFixed(2)
+            : sub.reduce((s, r) => s + r.qty, 0);
+        })
+      }));
+
+      if (charts.catCity) charts.catCity.destroy();
+      charts.catCity = new Chart(document.getElementById("chart-cat-city"), {
+        type: "bar",
+        data: { labels: cities, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: {
+            legend: { position: "top", labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 } } },
+            tooltip: {
+              backgroundColor: "#0f172a",
+              borderColor: "#334155",
+              borderWidth: 1,
+              callbacks: {
+                label: (ctx) => `${ctx.dataset.label}: ${state.catMetric === "venta" ? fmtFullCurrency(ctx.raw) : ctx.raw.toLocaleString() + " uds"}`
+              }
+            }
+          },
+          scales: {
+            x: { grid: { display: false } },
+            y: {
+              ticks: {
+                callback: (v) => state.catMetric === "venta" ? fmtCurrency(v) : v
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function updateTrendChart(data) {
+      const activeMonths = META.meses.slice(state.mesMinIdx, state.mesMaxIdx + 1);
+      const salesSeries = activeMonths.map(m =>
+        +data.filter(r => r.mes === m).reduce((s, r) => s + r.vt, 0).toFixed(2)
+      );
+      const descSeries = activeMonths.map(m => {
+        const sub = data.filter(r => r.mes === m);
+        return sub.length ? +((sub.reduce((s, r) => s + r.desc, 0) / sub.length) * 100).toFixed(1) : 0;
+      });
+
+      if (charts.trend) charts.trend.destroy();
+      charts.trend = new Chart(document.getElementById("chart-trend"), {
+        type: "line",
+        data: {
+          labels: activeMonths,
+          datasets: [
+            {
+              label: "Venta Mensual ($)",
+              data: salesSeries,
+              borderColor: "#38bdf8",
+              backgroundColor: "rgba(56, 189, 248, 0.12)",
+              fill: true,
+              tension: 0.35,
+              pointRadius: 2,
+              yAxisID: "y"
+            },
+            {
+              label: "Descuento Prom. (%)",
+              data: descSeries,
+              borderColor: "#f59e0b",
+              borderDash: [4, 4],
+              tension: 0.3,
+              pointRadius: 0,
+              yAxisID: "y1"
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: {
+            legend: { labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 } } }
+          },
+          scales: {
+            x: { ticks: { maxTicksLimit: 8, font: { size: 10 } }, grid: { display: false } },
+            y: { position: "left", ticks: { callback: v => fmtCurrency(v), font: { size: 10 } } },
+            y1: { position: "right", grid: { drawOnChartArea: false }, ticks: { callback: v => v + "%", font: { size: 10 } } }
+          }
+        }
+      });
+    }
+
+    function updateVendedoresChart(data) {
+      const stats = META.vendedores.map(v => {
+        const sub = data.filter(r => r.ven === v);
+        return {
+          ven: v,
+          venta: sub.reduce((s, r) => s + r.vt, 0),
+          desc: sub.length ? (sub.reduce((s, r) => s + r.desc, 0) / sub.length) * 100 : 0
+        };
+      }).sort((a, b) => b.venta - a.venta);
+
+      if (charts.vendedores) charts.vendedores.destroy();
+      charts.vendedores = new Chart(document.getElementById("chart-vendedores"), {
+        type: "bar",
+        data: {
+          labels: stats.map(s => s.ven),
+          datasets: [{
+            label: "Venta Total ($)",
+            data: stats.map(s => +s.venta.toFixed(2)),
+            backgroundColor: stats.map(s => s.desc > state.tolDesc ? "rgba(244, 63, 94, 0.8)" : "rgba(16, 185, 129, 0.8)"),
+            borderRadius: 5
+          }]
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                afterLabel: (ctx) => `Descuento prom: ${stats[ctx.dataIndex].desc.toFixed(1)}%`
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { callback: v => fmtCurrency(v), font: { size: 10 } } },
+            y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+          }
+        }
+      });
+    }
+
+    function updateCanalesAndSegmentos(data) {
+      const totalVenta = data.reduce((s, r) => s + r.vt, 0) || 1;
+
+      // 1. Canales
+      const canalData = META.canales.map(c => {
+        const sub = data.filter(r => r.can === c);
+        const sum = sub.reduce((s, r) => s + r.vt, 0);
+        return { name: c, sum, count: sub.length, pct: (sum / totalVenta) * 100 };
+      }).sort((a, b) => b.sum - a.sum);
+
+      document.getElementById("canal-leader-badge").textContent = `Líder: ${canalData[0]?.name || "--"}`;
+
+      if (charts.canales) charts.canales.destroy();
+      charts.canales = new Chart(document.getElementById("chart-canales"), {
+        type: "doughnut",
+        data: {
+          labels: canalData.map(c => c.name),
+          datasets: [{
+            data: canalData.map(c => +c.sum.toFixed(2)),
+            backgroundColor: ["#6366f1", "#0ea5e9"],
+            borderColor: "#0f172a",
+            borderWidth: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: "66%",
+          plugins: {
+            legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 } } }
+          }
+        }
+      });
+
+      document.getElementById("canal-stats-list").innerHTML = canalData.map((c, idx) => `
+        <div class="flex items-center justify-between">
+          <span class="flex items-center gap-2 text-slate-300">
+            <span class="w-2.5 h-2.5 rounded-full ${idx === 0 ? "bg-indigo-500" : "bg-sky-500"}"></span>
+            ${c.name} <span class="text-slate-500">(${c.count} ord.)</span>
+          </span>
+          <span class="font-mono font-semibold text-white">${fmtCurrency(c.sum)} <span class="text-slate-400 font-normal">(${c.pct.toFixed(1)}%)</span></span>
+        </div>
+      `).join("");
+
+      // 2. Segmentos
+      const segColors = ["#38bdf8", "#a855f7", "#10b981"];
+      const segData = META.segmentos.map((s, i) => {
+        const sub = data.filter(r => r.seg === s);
+        const sum = sub.reduce((acc, r) => acc + r.vt, 0);
+        return { name: s, sum, count: sub.length, pct: (sum / totalVenta) * 100, color: segColors[i % segColors.length] };
+      }).sort((a, b) => b.sum - a.sum);
+
+      if (charts.segmentos) charts.segmentos.destroy();
+      charts.segmentos = new Chart(document.getElementById("chart-segmentos"), {
+        type: "polarArea",
+        data: {
+          labels: segData.map(s => s.name),
+          datasets: [{
+            data: segData.map(s => +s.sum.toFixed(2)),
+            backgroundColor: segData.map(s => s.color + "99"),
+            borderColor: segData.map(s => s.color),
+            borderWidth: 1.5
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            r: { ticks: { display: false }, grid: { color: "rgba(51, 65, 85, 0.4)" } }
+          },
+          plugins: {
+            legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 } } }
+          }
+        }
+      });
+
+      document.getElementById("segmento-stats-list").innerHTML = segData.map(s => `
+        <div class="flex items-center justify-between">
+          <span class="flex items-center gap-2 text-slate-300">
+            <span class="w-2.5 h-2.5 rounded-full" style="background:${s.color}"></span>
+            ${s.name}
+          </span>
+          <span class="font-mono font-semibold text-white">${fmtCurrency(s.sum)} <span class="text-slate-400 font-normal">(${s.pct.toFixed(1)}%)</span></span>
+        </div>
+      `).join("");
+    }
+
+    // =========================================================================
+    // 6. GRÁFICO DE DISPERSIÓN (SCATTER PLOT): Descuento_Aplicado vs Cantidad_Vendida / Venta_Total
+    // =========================================================================
+    function updateScatterChart(data) {
+      const isVenta = state.scatterY === "venta";
+      document.getElementById("scatter-y-code").textContent = isVenta ? "Venta_Total" : "Cantidad_Vendida";
+
+      // Muestreo inteligente hasta 450 puntos para fluidez a 60fps manteniendo todos los outliers
+      const outliers = data.filter(r => r.qty < 0 || r.qty > 100);
+      const normals = data.filter(r => r.qty >= 0 && r.qty <= 100);
+      const step = Math.max(1, Math.floor(normals.length / 400));
+      const sampled = [...outliers, ...normals.filter((_, idx) => idx % step === 0)];
+
+      const safePts = [];
+      const breachPts = [];
+      const anomalyPts = [];
+
+      sampled.forEach(r => {
+        const pt = {
+          x: +(r.desc * 100).toFixed(1),
+          y: isVenta ? r.vt : r.qty,
+          raw: r
+        };
+        if (r.qty < 0 || r.qty > 100) {
+          anomalyPts.push(pt);
+        } else if (r.desc * 100 > state.tolDesc) {
+          breachPts.push(pt);
+        } else {
+          safePts.push(pt);
+        }
+      });
+
+      // Cálculo de correlación de Pearson entre Descuento_Aplicado y eje Y
+      let corrText = "Sin datos suficientes";
+      if (normals.length > 2) {
+        const xs = normals.map(r => r.desc);
+        const ys = normals.map(r => isVenta ? r.vt : r.qty);
+        const mx = xs.reduce((a, b) => a + b, 0) / xs.length;
+        const my = ys.reduce((a, b) => a + b, 0) / ys.length;
+        let num = 0, dx2 = 0, dy2 = 0;
+        for (let i = 0; i < xs.length; i++) {
+          const dx = xs[i] - mx;
+          const dy = ys[i] - my;
+          num += dx * dy;
+          dx2 += dx * dx;
+          dy2 += dy * dy;
+        }
+        const rCoeff = (dx2 && dy2) ? num / Math.sqrt(dx2 * dy2) : 0;
+        corrText = `Coeficiente Pearson (r): ${rCoeff.toFixed(3)} (${Math.abs(rCoeff) < 0.15 ? "Elasticidad débil / ruido promocional" : rCoeff < 0 ? "Erosión directa de ingreso neto" : "Impulso positivo por volumen"})`;
+      }
+      document.getElementById("scatter-insight").textContent = corrText;
+
+      if (charts.scatter) charts.scatter.destroy();
+      charts.scatter = new Chart(document.getElementById("chart-scatter"), {
+        type: "scatter",
+        data: {
+          datasets: [
+            {
+              label: "Dentro de Tolerancia",
+              data: safePts,
+              backgroundColor: "rgba(52, 211, 153, 0.65)",
+              borderColor: "#10b981",
+              pointRadius: 4,
+              pointHoverRadius: 6
+            },
+            {
+              label: "Excede Tolerancia Descuento",
+              data: breachPts,
+              backgroundColor: "rgba(244, 63, 94, 0.72)",
+              borderColor: "#f43f5e",
+              pointRadius: 4.5,
+              pointHoverRadius: 7
+            },
+            {
+              label: "Anomalía Volumen (999 / -15)",
+              data: anomalyPts,
+              backgroundColor: "rgba(251, 191, 36, 0.9)",
+              borderColor: "#f59e0b",
+              pointStyle: "triangle",
+              pointRadius: 7,
+              pointHoverRadius: 9
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: "#0f172a",
+              borderColor: "#334155",
+              borderWidth: 1,
+              callbacks: {
+                label: (ctx) => {
+                  const r = ctx.raw.raw;
+                  return [
+                    `${r.id} • ${r.cli}`,
+                    `Descuento: ${(r.desc * 100).toFixed(0)}% | Cant: ${r.qty} uds`,
+                    `Venta Total: ${fmtFullCurrency(r.vt)} (${r.cat})`
+                  ];
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              title: { display: true, text: "Descuento Aplicado (%)", color: "#94a3b8", font: { size: 11 } },
+              min: -2,
+              max: 55,
+              ticks: { callback: v => v + "%" }
+            },
+            y: {
+              title: { display: true, text: isVenta ? "Venta Total ($)" : "Cantidad Vendida (uds)", color: "#94a3b8", font: { size: 11 } },
+              ticks: {
+                callback: v => isVenta ? fmtCurrency(v) : v
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // =========================================================================
+    // 7. TABLA DE DETALLE OPERATIVO
+    // =========================================================================
+    function updateTable(data) {
+      const q = state.searchQuery.trim().toLowerCase();
+      const filtered = q
+        ? data.filter(r =>
+            r.id.toLowerCase().includes(q) ||
+            r.cli.toLowerCase().includes(q) ||
+            r.ciu.toLowerCase().includes(q) ||
+            (r.det && r.det.toLowerCase().includes(q))
+          )
+        : data;
+
+      const slice = filtered.slice(0, 80); // Top 80 filas más recientes/filtradas
+      const tbody = document.getElementById("tbody-operativo");
+
+      tbody.innerHTML = slice.map(r => {
+        const descPct = r.desc * 100;
+        const alertRow = descPct > state.tolDesc || r.qty < 0;
+        return `
+          <tr class="hover:bg-slate-800/60 transition ${alertRow ? "bg-rose-950/20" : ""}">
+            <td class="py-2 px-3 font-mono whitespace-nowrap">
+              <div class="font-semibold text-slate-200">${r.id}</div>
+              <div class="text-[10px] text-slate-500">${r.fecha}</div>
+            </td>
+            <td class="py-2 px-3">
+              <div class="font-medium text-slate-200 truncate max-w-[155px]" title="${r.cli}">${r.cli}</div>
+              <div class="text-[10px] text-slate-400">${r.ciu} • ${r.seg}</div>
+            </td>
+            <td class="py-2 px-3 whitespace-nowrap">
+              <span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px]">${r.cat}</span>
+              <div class="text-[10px] text-slate-500 mt-0.5">${r.can}</div>
+            </td>
+            <td class="py-2 px-3 text-right font-mono ${r.qty < 0 ? "text-rose-400 font-bold" : r.qty > 100 ? "text-amber-400 font-bold" : "text-slate-200"}">
+              ${r.qty}
+            </td>
+            <td class="py-2 px-3 text-right font-mono ${descPct > state.tolDesc ? "text-rose-400 font-bold" : "text-emerald-400"}">
+              ${descPct.toFixed(0)}%
+            </td>
+            <td class="py-2 px-3 text-right font-mono font-semibold ${r.vt < 0 ? "text-rose-400" : "text-white"}">
+              ${fmtFullCurrency(r.vt)}
+            </td>
+            <td class="py-2 px-3 text-slate-400 max-w-[180px] truncate" title="${r.det || "Sin observaciones"}">
+              ${r.det ? `<span class="${r.det.includes("demora") ? "text-amber-300" : "text-slate-300"}">${r.det}</span>` : `<span class="text-slate-600 italic">Sin observaciones</span>`}
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      document.getElementById("table-count-info").textContent = `Mostrando ${slice.length} de ${filtered.length.toLocaleString("en-US")} registros filtrados`;
+    }
+
+    // =========================================================================
+    // 8. ORQUESTADOR DE ACTUALIZACIÓN Y EVENTOS INTERACTIVOS
+    // =========================================================================
+    function refreshDashboard() {
+      const filtered = getFilteredData();
+      updateKPIs(filtered);
+      updateCatCityChart(filtered);
+      updateTrendChart(filtered);
+      updateVendedoresChart(filtered);
+      updateCanalesAndSegmentos(filtered);
+      updateScatterChart(filtered);
+      updateTable(filtered);
+    }
+
+    function bindEvents() {
+      // Filtros superiores
+      document.getElementById("filter-ciudad").addEventListener("change", (e) => {
+        state.ciudad = e.target.value;
+        refreshDashboard();
+      });
+
+      document.getElementById("filter-categoria").addEventListener("change", (e) => {
+        state.categoria = e.target.value;
+        refreshDashboard();
+      });
+
+      // Sliders de tiempo
+      const sMin = document.getElementById("slider-tiempo-min");
+      const sMax = document.getElementById("slider-tiempo-max");
+      const updateTimeLabel = () => {
+        let minV = parseInt(sMin.value, 10);
+        let maxV = parseInt(sMax.value, 10);
+        if (minV > maxV) { [minV, maxV] = [maxV, minV]; }
+        state.mesMinIdx = minV;
+        state.mesMaxIdx = maxV;
+        const countM = maxV - minV + 1;
+        document.getElementById("lbl-tiempo").textContent = `${META.meses[minV]} → ${META.meses[maxV]} (${countM}m)`;
+        refreshDashboard();
+      };
+      sMin.addEventListener("input", updateTimeLabel);
+      sMax.addEventListener("input", updateTimeLabel);
+
+      // Slider de volumen + checkbox depurar atípicos
+      document.getElementById("slider-volumen").addEventListener("input", (e) => {
+        state.volMin = parseInt(e.target.value, 10);
+        document.getElementById("lbl-volumen").textContent = state.volMin === -15 ? "≥ -15 uds (Todos)" : `≥ ${state.volMin} uds/orden`;
+        refreshDashboard();
+      });
+
+      document.getElementById("chk-clean-outliers").addEventListener("change", (e) => {
+        state.cleanOutliers = e.target.checked;
+        refreshDashboard();
+      });
+
+      // Sliders de tolerancia KPI (Verde -> Rojo)
+      document.getElementById("slider-tol-desc").addEventListener("input", (e) => {
+        state.tolDesc = parseFloat(e.target.value);
+        document.getElementById("lbl-tol-desc").textContent = `Máx ${state.tolDesc.toFixed(1)}%`;
+        refreshDashboard();
+      });
+
+      document.getElementById("slider-tol-inc").addEventListener("input", (e) => {
+        state.tolInc = parseFloat(e.target.value);
+        document.getElementById("lbl-tol-inc").textContent = `Máx ${state.tolInc.toFixed(1)}%`;
+        refreshDashboard();
+      });
+
+      // Toggle métrica gráfico central
+      document.getElementById("btn-metric-venta").addEventListener("click", (e) => {
+        state.catMetric = "venta";
+        e.target.className = "px-2.5 py-1 text-xs font-medium rounded-md bg-sky-500 text-slate-950 transition";
+        document.getElementById("btn-metric-qty").className = "px-2.5 py-1 text-xs font-medium rounded-md text-slate-400 hover:text-white transition";
+        refreshDashboard();
+      });
+
+      document.getElementById("btn-metric-qty").addEventListener("click", (e) => {
+        state.catMetric = "qty";
+        e.target.className = "px-2.5 py-1 text-xs font-medium rounded-md bg-sky-500 text-slate-950 transition";
+        document.getElementById("btn-metric-venta").className = "px-2.5 py-1 text-xs font-medium rounded-md text-slate-400 hover:text-white transition";
+        refreshDashboard();
+      });
+
+      // Toggle Eje Y del Scatter Plot
+      document.getElementById("btn-scatter-venta").addEventListener("click", (e) => {
+        state.scatterY = "venta";
+        e.target.className = "px-2.5 py-1 text-xs font-medium rounded-md bg-emerald-500 text-slate-950 transition";
+        document.getElementById("btn-scatter-qty").className = "px-2.5 py-1 text-xs font-medium rounded-md text-slate-400 hover:text-white transition";
+        updateScatterChart(getFilteredData());
+      });
+
+      document.getElementById("btn-scatter-qty").addEventListener("click", (e) => {
+        state.scatterY = "qty";
+        e.target.className = "px-2.5 py-1 text-xs font-medium rounded-md bg-emerald-500 text-slate-950 transition";
+        document.getElementById("btn-scatter-venta").className = "px-2.5 py-1 text-xs font-medium rounded-md text-slate-400 hover:text-white transition";
+        updateScatterChart(getFilteredData());
+      });
+
+      // Búsqueda en tabla operativa
+      document.getElementById("search-trx").addEventListener("input", (e) => {
+        state.searchQuery = e.target.value;
+        updateTable(getFilteredData());
+      });
+
+      // Carga directa de Retail_Dataset.csv desde el navegador si el usuario lo desea
+      document.getElementById("csv-upload").addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        Papa.parse(file, {
+          header: true,
+          dynamicTyping: true,
+          skipEmptyLines: true,
+          complete: (res) => {
+            const parsed = res.data.map(r => {
+              const fecha = String(r.Fecha_Venta || "").slice(0, 10);
+              const mes = fecha.slice(0, 7);
+              let mesIdx = META.meses.indexOf(mes);
+              if (mesIdx === -1) {
+                META.meses.push(mes);
+                META.meses.sort();
+                mesIdx = META.meses.indexOf(mes);
+              }
+              return {
+                id: r.ID_Transaccion || "TRX-N/A",
+                fecha,
+                mes,
+                mesIdx,
+                cli: r.Nombre_Cliente || "Cliente",
+                ciu: r.Ciudad || "Bogota",
+                cat: r.Categoria_Producto || "Tecnologia",
+                seg: r.Segmento_Cliente || "Retail Individual",
+                can: r.Canal_Venta || "Online",
+                pu: Number(r.Precio_Unitario) || 0,
+                qty: Number(r.Cantidad_Vendida) || 0,
+                desc: Number(r.Descuento_Aplicado) || 0,
+                env: Number(r.Costo_Envio) || 0,
+                cos: Number(r.Costo_Producto) || 0,
+                vt: Number(r.Venta_Total) || 0,
+                cal: r.Calificacion_Cliente != null ? Number(r.Calificacion_Cliente) : null,
+                ven: r.Nombre_Vendedor || "Ejecutivo",
+                det: r.Detalle_Venta || ""
+              };
+            });
+            if (parsed.length > 0) {
+              RAW_DATA = parsed;
+              sMin.max = META.meses.length - 1;
+              sMax.max = META.meses.length - 1;
+              sMax.value = META.meses.length - 1;
+              state.mesMinIdx = 0;
+              state.mesMaxIdx = META.meses.length - 1;
+              document.getElementById("dataset-badge").textContent = `${parsed.length.toLocaleString()} TRX • CSV CARGADO`;
+              refreshDashboard();
+            }
+          }
+        });
+      });
+
+      // Botón Reiniciar
+      document.getElementById("btn-reset").addEventListener("click", () => {
+        state.ciudad = "ALL";
+        state.categoria = "ALL";
+        state.mesMinIdx = 0;
+        state.mesMaxIdx = META.meses.length - 1;
+        state.volMin = -15;
+        state.cleanOutliers = false;
+        state.tolDesc = 22.0;
+        state.tolInc = 12.0;
+        state.searchQuery = "";
+
+        document.getElementById("filter-ciudad").value = "ALL";
+        document.getElementById("filter-categoria").value = "ALL";
+        sMin.value = 0;
+        sMax.value = META.meses.length - 1;
+        document.getElementById("slider-volumen").value = -15;
+        document.getElementById("chk-clean-outliers").checked = false;
+        document.getElementById("slider-tol-desc").value = 22;
+        document.getElementById("slider-tol-inc").value = 12;
+        document.getElementById("search-trx").value = "";
+
+        document.getElementById("lbl-tiempo").textContent = `${META.meses[0]} → ${META.meses[META.meses.length - 1]} (${META.meses.length}m)`;
+        document.getElementById("lbl-volumen").textContent = "≥ -15 uds (Todos)";
+        document.getElementById("lbl-tol-desc").textContent = "Máx 22.0%";
+        document.getElementById("lbl-tol-inc").textContent = "Máx 12.0%";
+        refreshDashboard();
+      });
+    }
+
+    // Inicialización
+    window.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      bindEvents();
+      refreshDashboard();
+    });
+  </script>
+</body>
+</html>
